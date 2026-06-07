@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Juiceme</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; cursor: none; }
     body {
       background: #000;
       display: flex;
@@ -57,7 +57,7 @@
     const NUM_GLITTERS = 500;
     const glitters = [];
 
-    function randomGlitter(forceEdge) {
+    function randomGlitter() {
       return {
         x: Math.random() * BW,
         y: Math.random() * BH,
@@ -68,15 +68,10 @@
         twinkleSpeed: Math.random() * 0.04 + 0.01,
         phase: Math.random() * Math.PI * 2,
         hue: Math.random() < 0.6
-          ? Math.random() * 50 + 310   // pinks/reds
+          ? Math.random() * 50 + 310
           : Math.random() < 0.5
-            ? Math.random() * 40 + 180  // blues
-            : Math.random() * 30 + 50,  // gold/yellow
-        // cursor trail properties
-        trailX: 0,
-        trailY: 0,
-        trailActive: false,
-        trailAlpha: 0,
+            ? Math.random() * 40 + 180
+            : Math.random() * 30 + 50,
       };
     }
 
@@ -86,21 +81,18 @@
     }
     initGlitters();
 
-    // Cursor trail particles — burst from cursor
     const TRAIL_PARTICLES = [];
     const MAX_TRAIL = 120;
 
     function spawnTrail(x, y) {
       if (TRAIL_PARTICLES.length >= MAX_TRAIL) return;
-      const count = 3;
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < 3; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = Math.random() * 2.5 + 0.5;
         TRAIL_PARTICLES.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          alpha: 1,
           size: Math.random() * 2.5 + 0.8,
           hue: Math.random() < 0.5 ? Math.random() * 50 + 310 : Math.random() * 40 + 40,
           life: 1,
@@ -109,13 +101,8 @@
       }
     }
 
-    let lastMX = mouse.x, lastMY = mouse.y;
-    document.addEventListener('mousemove', e => {
-      spawnTrail(e.clientX, e.clientY);
-    });
-    document.addEventListener('touchmove', e => {
-      spawnTrail(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: true });
+    document.addEventListener('mousemove', e => spawnTrail(e.clientX, e.clientY));
+    document.addEventListener('touchmove', e => spawnTrail(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
 
     const INFLUENCE = 200;
 
@@ -125,8 +112,6 @@
       ctx.globalAlpha = alpha;
       const s = size * (1 + proximity * 1.8);
       ctx.fillStyle = `hsl(${hue}, 100%, ${65 + proximity * 35}%)`;
-
-      // 4-point star
       ctx.beginPath();
       for (let p = 0; p < 4; p++) {
         const angle = (p / 4) * Math.PI * 2;
@@ -140,21 +125,17 @@
       }
       ctx.closePath();
       ctx.fill();
-
-      // bright core
       ctx.globalAlpha = alpha * 0.95;
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(0, 0, s * 0.2, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.restore();
     }
 
     function drawGlitters(timestamp) {
       bgCtx.clearRect(0, 0, BW, BH);
 
-      // big soft cursor glow
       const grd = bgCtx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, INFLUENCE);
       grd.addColorStop(0,   'rgba(255,80,160,0.18)');
       grd.addColorStop(0.4, 'rgba(200,40,120,0.08)');
@@ -164,19 +145,14 @@
 
       const t = timestamp * 0.001;
 
-      // Draw & move ambient glitters
       for (const g of glitters) {
-        // drift
         g.x += g.vx;
         g.y += g.vy;
-
-        // wrap around edges
         if (g.x < -10) g.x = BW + 10;
         if (g.x > BW + 10) g.x = -10;
         if (g.y < -10) g.y = BH + 10;
         if (g.y > BH + 10) g.y = -10;
 
-        // cursor attraction — glitters near cursor gently pull toward it
         const dx = mouse.x - g.x;
         const dy = mouse.y - g.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -185,25 +161,20 @@
         if (proximity > 0) {
           g.vx += dx * 0.0003;
           g.vy += dy * 0.0003;
-          // dampen so they don't fly away
           g.vx *= 0.97;
           g.vy *= 0.97;
         } else {
-          // natural slow drift
           g.vx *= 0.995;
           g.vy *= 0.995;
-          // tiny random nudge to keep them alive
           g.vx += (Math.random() - 0.5) * 0.04;
           g.vy += (Math.random() - 0.5) * 0.04;
         }
 
         const twinkle = 0.5 + 0.5 * Math.sin(t * g.twinkleSpeed * 60 + g.phase);
         const a = twinkle * (0.2 + proximity * 0.8);
-
         drawStar(bgCtx, g.x, g.y, g.size, g.hue, a, proximity);
       }
 
-      // Draw cursor trail particles
       for (let i = TRAIL_PARTICLES.length - 1; i >= 0; i--) {
         const p = TRAIL_PARTICLES[i];
         p.x += p.vx;
@@ -211,21 +182,13 @@
         p.vx *= 0.93;
         p.vy *= 0.93;
         p.life -= p.decay;
-        p.alpha = p.life;
-
-        if (p.life <= 0) {
-          TRAIL_PARTICLES.splice(i, 1);
-          continue;
-        }
+        if (p.life <= 0) { TRAIL_PARTICLES.splice(i, 1); continue; }
 
         bgCtx.save();
         bgCtx.translate(p.x, p.y);
-        bgCtx.globalAlpha = p.alpha * 0.9;
-
+        bgCtx.globalAlpha = p.life * 0.9;
         const s = p.size * p.life;
         bgCtx.fillStyle = `hsl(${p.hue}, 100%, 80%)`;
-
-        // sparkle cross
         bgCtx.beginPath();
         for (let k = 0; k < 4; k++) {
           const a2 = (k / 4) * Math.PI * 2;
@@ -235,13 +198,11 @@
         }
         bgCtx.closePath();
         bgCtx.fill();
-
-        bgCtx.globalAlpha = p.alpha;
+        bgCtx.globalAlpha = p.life;
         bgCtx.fillStyle = '#fff';
         bgCtx.beginPath();
         bgCtx.arc(0, 0, s * 0.25, 0, Math.PI * 2);
         bgCtx.fill();
-
         bgCtx.restore();
       }
 
